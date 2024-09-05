@@ -1,13 +1,13 @@
 /*global QUnit*/
 
 sap.ui.define([
-	"nus/edu/consolidatedreport/claimconsolidatereport/controller/Home.controller"
+	"nus/edu/sg/cw_detailedreport/controller/report.controller"
 ], function (Controller) {
 	"use strict";
 
-	QUnit.module("Home Controller");
+	QUnit.module("report Controller");
 
-	QUnit.test("I should test the Home controller", function (assert) {
+	QUnit.test("I should test the report controller", function (assert) {
 		var oAppController = new Controller();
 		oAppController.onInit();
 		assert.ok(oAppController);

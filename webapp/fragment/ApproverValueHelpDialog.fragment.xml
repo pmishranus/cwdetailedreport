@@ -1,12 +1,13 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
 	<TableSelectDialog noDataText="No Data Found" title="Select Approver" search=".handleSearchApprover" confirm=".handleConfirmApprover"
-		cancel=".handleCloseApprover" items="{ path : 'AppModel>/Approver', sorter : { path : 'STAFF_NUSNET_ID', descending : true } }">
+		cancel=".handleCloseApprover" items="{ path : 'AppModel>/Approver', sorter : { path : 'TASK_ASSGN_TO_STF_NUMBER', descending : true } }"
+		multiSelect="true">
 		<ColumnListItem vAlign="Middle">
 			<cells>
-				<ObjectIdentifier title="{AppModel>STAFF_ID}" text="{AppModel>FULL_NM}"/>
-				<Text text="{AppModel>STAFF_NUSNET_ID}"/>
-				<ObjectIdentifier title="{AppModel>ULU}" text="{AppModel>ULU_T}"/>
-				<ObjectIdentifier title="{AppModel>FDLU}" text="{AppModel>FDLU_T}"/>
+				<ObjectIdentifier title="{AppModel>TASK_ASSGN_TO_STF_NUMBER}" text="{AppModel>FULL_NM}"/>
+				<Text text="{AppModel>TASK_ASSGN_TO}"/>
+				<!--<ObjectIdentifier title="{AppModel>ULU}" text="{AppModel>ULU_T}"/>-->
+				<!--<ObjectIdentifier title="{AppModel>FDLU}" text="{AppModel>FDLU_T}"/>-->
 			</cells>
 		</ColumnListItem>
 		<columns>
@@ -20,7 +21,7 @@
 					<Text text="Nusnet ID"/>
 				</header>
 			</Column>
-			<Column minScreenWidth="Desktop" demandPopin="true">
+			<!--<Column minScreenWidth="Desktop" demandPopin="true">
 				<header>
 					<Text text="ULU"/>
 				</header>
@@ -29,7 +30,7 @@
 				<header>
 					<Text text="FDLU"/>
 				</header>
-			</Column>
+			</Column>-->
 		</columns>
 	</TableSelectDialog>
 </core:FragmentDefinition>

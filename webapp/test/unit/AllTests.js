@@ -1,5 +1,5 @@
 sap.ui.define([
-	"nus/edu/consolidatedreport/claimconsolidatereport/test/unit/controller/Home.controller"
+	"nus/edu/sg/cw_detailedreport/test/unit/controller/report.controller"
 ], function () {
 	"use strict";
 });

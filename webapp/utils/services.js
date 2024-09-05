@@ -14,55 +14,16 @@ sap.ui.define([
 			sap.ui.getCore().setModel(userModel, "userapi");
 			userModel.dataLoaded().then(function () {
 				var sUserName = sap.ui.getCore().getModel("userapi").getData().name;
-		//		sUserName = "GIANINAR"; //VERFIER
-				// sUserName = "CHEYEK"; //Super Admin
-				// sUserName = "PTT_AP2"; //approval
-				// sUserName = "NUS_SECMM1"; //approval
-				// sUserName = "CSIRGA"; //approvl
-				// sUserName = "CHEZDL"; //claimant
-			//	 sUserName = "GIANINAR"; //Matr
+				// sUserName = "CW_CA2"; //VERFIER
+				 //sUserName = "CW_UID151516"; //CA
+				 //sUserName="CW_CA3";
 				sThis.AppModel.setProperty("/loggedInUserId", sUserName);
 				that._getUserDetails(sThis, that, sUserName, callBackFx);
 			}.bind(sThis));
 		},
-		// _getUserDetails: function (sThis, sUserName, callBackFx) {
-		// 	var authModel = new JSONModel();
-		// 	var sUrl = Config.dbOperations.eclaimAuthToken;
-		// 	var oJsonModel = new sap.ui.model.json.JSONModel();
-		// 	 //sUserName = "CHEYEK"; //Super Admin
-		// //	 sUserName = "PTT_CA1"; //VERFIER
-		// 	var sUserIASUrl = "/IASUserScim?filter=userName eq '" + sUserName + "'";
-		// 	oJsonModel.loadData(sUserIASUrl, null, false);
-		// 	sap.ui.getCore().setModel(oJsonModel, "userIAS");
-		// 	oJsonModel.dataLoaded().then(function (oData) {
-		// 		sap.ui.getCore().getModel("userapi").setProperty("/pID", sap.ui.getCore().getModel("userIAS").getProperty("/id"));
-		// 		sUrl = sUrl + sUserName;
-		// 		// for claimant
-		// 		// sUrl = sUrl + "10000027";
-		// 		//for claim assistant
-		// 		// sUrl = sUrl + "10000035";
-		// 		authModel.loadData(sUrl, null, true, "GET", false, false);
-		// 		authModel.attachRequestCompleted(function (oResponse) {
-		// 			if (oResponse.getParameters().success) {
-		// 				if (oResponse.getSource().getProperty("/token")) {
-		// 					callBackFx(oResponse.getSource().getData());
-		// 				}
-		// 			} else {
-		// 				if (oResponse.getParameters()['errorobject'].statusCode === 503) {
-		// 					sThis.AppModel.setProperty("/ErrorPageDescription", oResponse.getParameters()['errorobject'].responseText);
-		// 					// sap.m.MessageBox.error(oResponse.getParameters()['errorobject'].responseText);
-		// 					sThis.AppModel.setProperty("/ErrorPageTitle", "Service Maintenance");
-		// 					sThis.AppModel.setProperty("/ErrorPageText", "Please reach out to the admin team if not started working in next 10 minutes.");
-		// 					sThis.oRouter.navTo("NotFound", true);
-		// 					return;
-		// 				}
-		// 			}
 
-		// 		}.bind(sThis));
-		// 	});
-		// },
 		_getUserDetails: function (sThis, that, sUserName, callBackFx) {
-			var oHeaders = {
+		var oHeaders = {
                     "Content-Type": "application/json"
                 };
                 var oPayload = {
@@ -71,6 +32,8 @@ sap.ui.define([
 			var sUrl = Config.dbOperations.eclaimAuthToken;
 			var authModel = new JSONModel();
 			authModel.loadData(sUrl, JSON.stringify(oPayload), null, "POST", false, false,oHeaders);
+	// sUrl = sUrl + sUserName;
+	// 		authModel.loadData(sUrl, null, null, "GET", false, false);
 			authModel.attachRequestCompleted(function (oResponse) {
 				if (oResponse.getParameters().success) {
 					if (oResponse.getSource().getProperty("/token")) {
@@ -104,9 +67,8 @@ sap.ui.define([
 			};
 			userInfoModel.loadData(Config.dbOperations.userDetails, null, false, "GET", false, false, oHeaders);
 			return userInfoModel.getData();
-		},		
+		},
 
-		
 		fetchLoggeInUserImage: function (sThis, callBackFx) {
 			var oPhotoModel = new JSONModel();
 			var sUrl = Config.dbOperations.fetchPhotoUser;

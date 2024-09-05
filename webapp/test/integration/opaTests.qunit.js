@@ -5,7 +5,7 @@ sap.ui.getCore().attachInit(function () {
 	"use strict";
 
 	sap.ui.require([
-		"nus/edu/consolidatedreport/claimconsolidatereport/test/integration/AllJourneys"
+		"nus/edu/sg/cw_detailedreport/test/integration/AllJourneys"
 	], function () {
 		QUnit.start();
 	});

@@ -3,7 +3,7 @@ sap.ui.define([
 ], function (Opa5) {
 	"use strict";
 
-	return Opa5.extend("nus.edu.consolidatedreport.claimconsolidatereport.test.integration.arrangements.Startup", {
+	return Opa5.extend("nus.edu.sg.cw_detailedreport.test.integration.arrangements.Startup", {
 
 		iStartMyApp: function (oOptionsParameter) {
 			var oOptions = oOptionsParameter || {};
@@ -14,7 +14,7 @@ sap.ui.define([
 			// start the app UI component
 			this.iStartMyUIComponent({
 				componentConfig: {
-					name: "nus.edu.consolidatedreport.claimconsolidatereport",
+					name: "nus.edu.sg.cw_detailedreport",
 					async: true
 				},
 				hash: oOptions.hash,

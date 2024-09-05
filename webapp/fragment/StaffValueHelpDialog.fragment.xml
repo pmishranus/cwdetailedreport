@@ -1,5 +1,5 @@
 <core:FragmentDefinition xmlns="sap.m" xmlns:core="sap.ui.core">
-	<TableSelectDialog noDataText="No Data Found" title="Select Staff" search=".handleSearchStaff" confirm=".handleConfirmStaff"
+	<TableSelectDialog rememberSelections="true" noDataText="No Data Found" title="Select Staff" search=".handleSearchStaff" confirm=".handleConfirmStaff"
 		contentHeight="auto" contentWidth="40%" cancel=".handleCloseStaff" multiSelect="true" growingThreshold="100"
 		items="{ path : 'AppModel>/claimRequest/StaffIdList' }">
 		<ColumnListItem vAlign="Middle">

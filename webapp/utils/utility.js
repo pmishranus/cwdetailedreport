@@ -4,9 +4,16 @@ sap.ui.define([
 	"sap/ui/model/FilterType",
 	"sap/ui/core/Fragment",
 	"sap/ui/model/Sorter",
-	"sap/ui/model/json/JSONModel"
-], function (Filter, FilterOperator, FilterType, Fragment, Sorter, JSONModel) {
+	"sap/ui/model/json/JSONModel",
+	"nus/edu/sg/cw_detailedreport/utils/services",
+	"nus/edu/sg/cw_detailedreport/utils/appconstant",
+	"nus/edu/sg/cw_detailedreport/utils/configuration",
+	"sap/m/Dialog",
+	"sap/m/Text"
+], function (Filter, FilterOperator, FilterType, Fragment, Sorter, JSONModel, Services, AppConstant, Config, Dialog, Text) {
 	"use strict";
-	var utility = ("nus.edu.sg.claimreport.utils.utility", {});
+	var utility = ("nus.edu.sg.cw_detailedreport.utils.utility", {
+		
+	});
 	return utility;
 }, true);

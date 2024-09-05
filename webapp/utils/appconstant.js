@@ -6,150 +6,45 @@ sap.ui.define([
 	"use strict";
 
 	return {
-		"claimAuthorizations":[],
-		"sClaimaintListUluFdlu":"",
-		"iconTabBarSelectedKey": "Draft",
-		"showSaveButton": false,
-		"showSubmitButton": false,
-		"showWithdrawButton": false,
-		"showRetractButton": false,
-		"showCheckButton": false,
-		"showRejectButton": false,
-		"showVerifyButton": false,
-		"showApproveButton": false,
-		"showAdditonalApprover2": false,
-		"showAdditionalApproverLink": true,
-		"showRemoveAdditionalApproverLink": false,
-		"exitFullScreen": true,
-		"closeColumn":true,
-		"requiredUiControl": {
-			"ClaimTypeDialog": {
-				"claimType": true,
-				"selectMonth": true,
-				"staffId": false,
-				"ulu": true,
-				"fdlu": true,
-				"claimRequestType": false
-			},
-			"ClaimDetailView": {
-				"startTime": false,
-				"endTime": false,
-				"hoursUnit": false,
-				"rateType": false,
-				"rateAmount": false,
-				"isDiscrepancy": false,
-				"amountDiscrepancy": false,
-				"totalAmount": false,
-				"wbs": false,
-				"remarks": false
-			}
-
-		},
+		"ErrorPageTitle": "ErrorPageTitle",
+		"ErrorPageText": "ErrorPageText",
+		"ErrorPageDescription": "ErrorPageDescription",
+		"ProcessCodeSelected": {},
+		"ProcessData": [],
+		"DelegationTo": [],
+		"delegationToUser": {},
+		"delegationForUser": {},
+		"delegationStartDate": new Date(),
+		"delegationEndDate": new Date(),
+		"taskInboxFilter": '',
 		"processFlowRequestID": "",
-		"processNode": {
-			"nodes": [],
-			"lanes": []
-		},
-		"errorMessage": [],
-		"errorMessages": {
-			"valueState": {
-				"ClaimTypeDialog": {
-					//"claimTypeDialogStaffId" : false
-					// "proceedButton" : false,
-					// "massuploadButton" : false
-				},
-				"ClaimDetailView": {
-					"wbs": false
-						// "Date" : true,
-						// "StartDate" : false,
-						// "EndDate" : false,
-						// "SelectDates" : false
-				},
-				"SelectPlanningDateFromCalendar": {
-					"wbs": false
-				}
-			},
-			"valueStateText": {
-				"ClaimTypeDialog": {
-					//"claimTypeDialogStaffId" : false
-					// "proceedButton" : false,
-					// "massuploadButton" : false
-				},
-				"ClaimDetailView": {
-					// "Date" : true,
-					// "StartDate" : false,
-					// "EndDate" : false,
-					// "SelectDates" : false
-					"wbs": false
-				},
-				"SelectPlanningDateFromCalendar": {
-					"wbs": false
-				}
-			}
-		},
+		"selectedKeyTask": "MyTask",
+		"submissionStartDate": "",
+		"submissionEndDate": "",
+		"selectedKeySubmissionDate": "Today",
+		"massApprovalText": "",
+		"massApprovalTextCode": "",
+		"massRejectText": "",
+		"massRejectTextCode": "",
+		"btnDisableForMassAction": false,
+		"remarks": "",
+		"actionPayload": [],
+		"taskView": "Default",
 		"token": null,
 		"loggedInUserId": null,
+		"loggedInUserStfNumber": null,
+		"loggedInUserSfStfNumber": null,
 		"loggedInUserInfo": {},
-		"enable": {
-			"ClaimTypeDialog": {
-
-			},
-			"ClaimDetailView": {
-				"ROW_ACTIONS": true,
-				"ROW_ADD": true,
-				"ROW_DELETE": true,
-				"CLAIM_START_DATE": true,
-				"CLAIM_END_DATE": true,
-				"CLAIM_DAY_TYPE": true,
-				"START_TIME": true,
-				"END_TIME": true,
-				"HOURS_UNIT": true,
-				"RATE_TYPE": true,
-				"RATE_TYPE_AMOUNT": true,
-				"IS_DISCREPENCY": true,
-				"DISC_RATETYPE_AMOUNT": true,
-				"WBS": true,
-				"REMARKS": true,
-				"VERIFIER_SRCH_HELP":false,
-				"ADD_1_SRCH_HELP":false,
-				"ADD_2_SRCH_HELP":false
-			}
-		},
+		"ProcessConfigs": [],
 		"visibility": {
-			"ClaimTypeDialog": {
-				"claimTypeDialogStaffId": false
-					// "proceedButton" : false,
-					// "massuploadButton" : false
-			},
-			"ClaimDetailView": {
-				"Date": true,
-				"StartDate": false,
-				"EndDate": false,
-				"StartTime": true,
-				"EndTime": true,
-				"SelectDates": false,
-				"UluFdluSelection": false
-			}
+			"actionColumn": false
 		},
 		"userRole": null,
 		"claimRequest": {
-			"selectedDates": [],
-			"disabledDates": [],
-			"createClaimRequest": {
-
-				"REMARKS": [],
-				"ADDTIONAL_APPROVER_1": [{}],
-				"ADDTIONAL_APPROVER_2": [{}],
-				"VERIFIER": [{}],
-				"EclaimsItemDataDates": [],
-				"massUploadResponseDisplay": [{}],
-				"singleRequestErrorMessages": []
-			},
-			"addApproversList": []
+			"createClaimRequest": {}
 		},
 		"staffList": [],
 		"claimsList": [],
-		"otherAssignments": [],
 		"months": {
 			"JANUARY": "01",
 			"FEBRUARY": "02",
@@ -169,6 +64,9 @@ sap.ui.define([
 		],
 		"days": ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
 		"filterLookupData": {
+			"TASK_INST_ID": [{
+				"TaskInstId": "T001"
+			}],
 			"REQ_ID": [{
 				"RequestId": "REQ002",
 				"StatusCode": "1"
@@ -187,17 +85,21 @@ sap.ui.define([
 			}]
 		},
 		"sortingLookupData": [{
+			"key": "TASK_INST_ID",
+			"selectedStatus": true,
+			"text": "Task Id"
+		}, {
+			"key": "REQUEST_ID",
+			"selectedStatus": false,
+			"text": "Request Id"
+		}, {
 			"key": "Period",
 			"selectedStatus": false,
 			"text": "Period"
 		}, {
-			"key": "CREATED_ON",
-			"selectedStatus": true,
-			"text": "Submitted On"
-		}, {
-			"key": "CLAIM_TYPE_T",
+			"key": "SUBMITTED_ON",
 			"selectedStatus": false,
-			"text": "Claim Type"
+			"text": "Submitted On"
 		}, {
 			"key": "FULL_NM",
 			"selectedStatus": false,
@@ -223,13 +125,58 @@ sap.ui.define([
 			"selectedStatus": false,
 			"text": "Submitted By"
 		}],
+		"groupLookupData": [{
+			"key": "TASK_INST_ID",
+			"selectedStatus": false,
+			"text": "Task Id"
+		}, {
+			"key": "REQUEST_ID",
+			"selectedStatus": false,
+			"text": "Request Id"
+		}, {
+			"key": "Period",
+			"selectedStatus": false,
+			"text": "Period"
+		}, {
+			"key": "SUBMITTED_ON",
+			"selectedStatus": false,
+			"text": "Submitted On"
+		}, {
+			"key": "FULL_NM",
+			"selectedStatus": false,
+			"text": "Staff Name"
+		}, {
+			"key": "STAFF_NUSNET_ID",
+			"selectedStatus": false,
+			"text": "Nusnet ID"
+		}, {
+			"key": "ULU_T",
+			"selectedStatus": false,
+			"text": "ULU"
+		}, {
+			"key": "FDLU_T",
+			"selectedStatus": false,
+			"text": "FDLU"
+		}, {
+			"key": "STATUS_ALIAS",
+			"selectedStatus": false,
+			"text": "Status"
+		}, {
+			"key": "SUBMITTED_BY_NID",
+			"selectedStatus": false,
+			"text": "Submitted By"
+		}],
+		"processNode": {
+			"nodes": [],
+			"lanes": []
+		},
 		"employeeInformation": {
 			"pageId": "employeePageId",
 			"header": "Employee Info",
 			"icon": "test-resources/sap/ui/documentation/sdk/images/johnDoe.png",
 			"displayShape": "Circle",
-			"title": "Michael Muller",
-			"description": "Account Manager",
+			"title": "",
+			"description": "",
 			"groups": [{
 				"heading": "User Details",
 				"elements": [{
@@ -237,6 +184,9 @@ sap.ui.define([
 						"value": ""
 					}, {
 						"label": "ULU",
+						"value": ""
+					}, {
+						"label": "FDLU",
 						"value": ""
 					}, {
 						"label": "Job Grade",
@@ -257,5 +207,6 @@ sap.ui.define([
 				]
 			}]
 		}
+
 	};
 });

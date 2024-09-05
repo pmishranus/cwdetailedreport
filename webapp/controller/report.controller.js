@@ -1,6 +1,7 @@
 sap.ui.define([
-	"../controller/BaseController", "sap/ui/model/json/JSONModel",
-	"sap/ui/model/Filter",
+	"../controller/BaseController", "../extensions/extendedvaluehelp", "sap/ui/core/Fragment",
+	"sap/ui/model/json/JSONModel",
+	"../utils/dataformatter", "../utils/massuploadhelper", "sap/m/MessageToast", "sap/m/MessageBox", "sap/ui/model/Filter",
 	"sap/ui/model/FilterOperator",
 	"sap/ui/model/FilterType",
 	"sap/ui/model/Sorter",
@@ -11,19 +12,20 @@ sap.ui.define([
 	"sap/ui/model/odata/v2/ODataModel",
 	"sap/ui/export/Spreadsheet",
 	"sap/ui/export/library",
-	"../utils/configuration",
-	"sap/ui/core/Fragment",
-	"sap/m/Token",
-	"sap/m/MessageBox"
-], function (BaseController, JSONModel, Filter,
-	FilterOperator, FilterType, Sorter, services, AppConstant, models, config, ODataModel, Spreadsheet, exportLibrary, Config, Fragment,
-	Token, MessageBox) {
+	"../utils/filter",
+	"sap/m/Token"
+], function (BaseController, ExtendedValueHelp, Fragment, JSONModel, Formatter, MassUploa, MessageToast, MessageBox, Filter,
+	FilterOperator, FilterType, Sorter, services, AppConstant, models, config, ODataModel, Spreadsheet, exportLibrary,
+	FilterUtility, Token) {
 	"use strict";
 	var EdmType = exportLibrary.EdmType;
-	return BaseController.extend("nus.edu.consolidatedreport.claimconsolidatereport.controller.Home", {
+	return BaseController.extend("nus.edu.sg.cw_detailedreport.controller.report", {
+		formatter: Formatter,
 		onInit: function () {
+
 			this.oRouter = this.getOwnerComponent().getRouter();
 			this._bDescendingSort = false;
+			this.getView().addStyleClass(this.getOwnerComponent().getContentDensityClass());
 
 			this.initializeModel();
 			var oClaimsReqTable = this.getView().byId("idClaimRequestsTable");
@@ -42,14 +44,17 @@ sap.ui.define([
 			// this.AppModel.setProperty("/submissionStartDate", currentDate);
 			// this.AppModel.setProperty("/submissionEndDate", currentDate);
 			this.generateTokenForLoggedInUser();
+
 			this.handleValueHelpPeriod();
 		},
 		_fnLoadMetaData: function () {
-			var serviceName = config.dbOperations.metadataClaims;
+			var serviceName = config.dbOperations.metadataclaims;
 			var token = this.AppModel.getProperty("/token");
 			var oHeaders = {
 				"Accept": "application/json",
-				"Authorization": "Bearer" + " " + token
+				"Authorization": "Bearer" + " " + token,
+				"AccessPoint": "A",
+				"Content-Type": "application/json"
 			};
 
 			var oDataModel = new ODataModel({
@@ -59,16 +64,60 @@ sap.ui.define([
 			oDataModel.setUseBatch(false);
 			oDataModel.metadataLoaded().then(function () {
 				this.getOwnerComponent().setModel(oDataModel, "EclaimSrvModel");
-				//	this._fetchLoggedInUserPhoto();
-				//		this.getTaskTypeDetails();
 				this.handleValueHelpStatus();
 				var noSearchHelpPopUp = 'Y';
 				this.handleValueHelpUlu(noSearchHelpPopUp);
 				this.handleValueHelpFdlu(noSearchHelpPopUp);
 				this.handleValueHelpRequestId();
 				this.handleValueHelpStaffId();
+				//				
 			}.bind(this));
 		},
+		_fetchLoggedInUserPhoto: function () {
+			//fetch photo
+			var that = this;
+			services.fetchLoggeInUserImage(that, function (oResponse) {
+				that.AppModel.setProperty("/staffPhoto", oResponse.photo ? "data:image/png;base64," + oResponse.photo : null);
+			});
+		},
+		// fetchMyTaskCount: function (compositeFilterForTaskCount) {
+		// 	var oDataModel = this.getOwnerComponent().getModel("EclaimSrvModel");
+		// 	var that = this;
+		// 	oDataModel.read("/TaskInboxs/$count", {
+		// 		filters: compositeFilterForTaskCount,
+		// 		success: function (oData) {
+		// 			if (oData) {
+		// 				that.getView().byId("itbFlMyTasks").setCount(oData);
+		// 			}
+		// 		},
+		// 		error: function (oError) {}
+		// 	});
+		// },
+		// fetchCompletedTaskCount: function (compositeFilterForTaskCount) {
+		// 	var oDataModel = this.getOwnerComponent().getModel("EclaimSrvModel");
+		// 	var that = this;
+		// 	oDataModel.read("/TaskInboxs/$count", {
+		// 		filters: compositeFilterForTaskCount,
+		// 		success: function (oData) {
+		// 			if (oData) {
+		// 				that.getView().byId("itbFlCompletedTasks").setCount(oData);
+		// 			}
+		// 		},
+		// 		error: function (oError) {}
+		// 	});
+		// },
+		// onSelectIconFilter: function (oEvent) {
+		// 	var sKey = oEvent.getSource().getSelectedKey();
+		// 	this._handleIcontabFilterKeySetting(sKey);
+
+		// },
+		// _handleIcontabFilterKeySetting: function (sKey) {
+		// 	if (sKey === "MyTask") {
+		// 		this.getTaskTypeDetails("95");
+		// 	} else if (sKey === "CompletedTasks") {
+		// 		this.getTaskTypeDetails("97");
+		// 	}
+		// },
 
 		generateTokenForLoggedInUser: function () {
 
@@ -82,16 +131,16 @@ sap.ui.define([
 				// this.AppModel.setProperty("/otherAssignments", oRetData.staffInfo.otherAssignments);
 				this.AppModel.setProperty("/claimAuthorizations", oRetData.staffInfo.claimAuthorizations);
 				this.AppModel.setProperty("/approverMatrix", oRetData.staffInfo.approverMatrix);
-			
+
 				var aListOfGroups = [];
 				if (oRetData.staffInfo.approverMatrix.length) {
 					for (var i = 0; i < oRetData.staffInfo.approverMatrix.length; i++) {
 						//addition of code to incorporate Super Admin as well from Approver matrix
 						if (oRetData.staffInfo.approverMatrix[i].STAFF_USER_GRP === 'MATRIX_ADMIN' &&
-						oRetData.staffInfo.approverMatrix[i].PROCESS_CODE === '100') {
+							oRetData.staffInfo.approverMatrix[i].PROCESS_CODE === '100') {
 							this.AppModel.setProperty("/userRoleGrp", 'NUS_CHRS_ECLAIMS_SUPER_ADMIN'); //Super Admin
 						}
-						//						
+						//
 						var oGroups = oRetData.staffInfo.approverMatrix[i];
 						if (aListOfGroups.indexOf(oGroups.STAFF_USER_GRP) < 0) {
 							aListOfGroups.push(oGroups.STAFF_USER_GRP);
@@ -130,8 +179,8 @@ sap.ui.define([
 		//new logic for the reports
 		//////////////////////////////////////////////////////////////////////////////////////////
 
+		//value help for Claim No.
 		handleValueHelpRequestId: function (oEvent) {
-
 			var oDataModel = this.getOwnerComponent().getModel("EclaimSrvModel");
 			var aFilter = [];
 			var orFilter = [];
@@ -153,6 +202,7 @@ sap.ui.define([
 			}
 
 			aFilter.push(new sap.ui.model.Filter("STATUS_CODE", sap.ui.model.FilterOperator.NE, '01'));
+			aFilter.push(new sap.ui.model.Filter("CLAIM_TYPE", sap.ui.model.FilterOperator.EQ, '102'));
 
 			// var uluList = this.AppModel.getProperty("/claimRequest/UluList");
 			// if (uluList) {
@@ -191,14 +241,13 @@ sap.ui.define([
 		},
 
 		openClaimNoValueHelpPopUp: function () {
-
 			var claimNoList = this.AppModel.getProperty("/claimRequest/originalClaimNoList");
 			this.AppModel.setProperty("/claimRequest/ClaimNoList", claimNoList);
 			var oView = this.getView();
 			if (!this._oDialogAddRequestId) {
 				this._oDialogAddRequestId = Fragment.load({
 					id: oView.getId(),
-					name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.RequestIdValueHelpDialog",
+					name: "nus.edu.sg.cw_detailedreport.fragment.RequestIdValueHelpDialog",
 					controller: this
 				}).then(function (oDialog) {
 					oView.addDependent(oDialog);
@@ -207,36 +256,17 @@ sap.ui.define([
 			}
 
 			this._oDialogAddRequestId.then(function (oDialog) {
-				oDialog.setRememberSelections(false);
+				oDialog.setRememberSelections(true);
 				oDialog.open();
 			});
 		},
 
 		handleSelectionFinishClaimNo: function (oEvent) {
-			//	debugger;
 			var selectedItemsClaimNo = oEvent.getParameter("selectedItems");
 			this.AppModel.setProperty("/claimRequest/selectedItemsClaimNo", selectedItemsClaimNo);
 		},
-		//
+
 		handleConfirmRequestId: function (oEvent) {
-			//debugger;
-			// var oBinding = oEvent.getSource().getBinding("items");
-			// oBinding.filter([]);
-
-			// var aContexts = oEvent.getParameter("selectedContexts");
-			// if (aContexts && aContexts.length) {
-			// 	var sPath = aContexts[0].getPath();
-			// 	var objSelectedStatus = this.AppModel.getProperty(sPath);
-
-			// 	// var objStatus = {
-			// 	// 	"STATUS_CODE": objSelectedStatus.STATUS_CODE,
-			// 	// 	"STATUS_ALIAS": objSelectedStatus.STATUS_ALIAS
-			// 	// };requestId
-			// 	this.AppModel.setProperty("/requestId", objSelectedStatus.REQUEST_ID);
-			// 	//this.AppModel.setProperty("/status", objSelectedStatus.STATUS_ALIAS);
-
-			// }
-
 			this.getUIControl("inpClaimNoValueHelp").removeAllTokens();
 			var aContexts = oEvent.getParameter("selectedContexts");
 			if (aContexts && aContexts.length) {
@@ -368,6 +398,14 @@ sap.ui.define([
 								if (item.ULU_C === '') {
 									continue;
 								}
+
+								if (oData.results.length === 1) {
+									this.getUIControl("inpUluValueHelp").addToken(new Token({
+										//text: oItem.getTitle()
+										text: oData.results[0].ULU_T,
+										key: oData.results[0].ULU_C
+									}));
+								}
 								uluListItem.ULU_C = item.ULU_C;
 								uluListItem.ULU_T = item.ULU_T;
 								uluListItem.FDLU_C = item.FDLU_C;
@@ -398,7 +436,7 @@ sap.ui.define([
 							if (!that._oDialogAddUlu) {
 								that._oDialogAddUlu = Fragment.load({
 									id: oView.getId(),
-									name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.UluValueHelpDialog",
+									name: "nus.edu.sg.cw_detailedreport.fragment.UluValueHelpDialog",
 									controller: that
 								}).then(function (oDialog) {
 									oView.addDependent(oDialog);
@@ -411,7 +449,7 @@ sap.ui.define([
 								oDialog.open();
 							}.bind(this));
 						}
-					},
+					}.bind(this),
 					error: function (oError) {
 
 					}
@@ -451,7 +489,7 @@ sap.ui.define([
 					if (!this._oDialogAddUlu) {
 						this._oDialogAddUlu = Fragment.load({
 							id: oView.getId(),
-							name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.UluValueHelpDialog",
+							name: "nus.edu.sg.cw_detailedreport.fragment.UluValueHelpDialog",
 							controller: this
 						}).then(function (oDialog) {
 							oView.addDependent(oDialog);
@@ -460,15 +498,22 @@ sap.ui.define([
 					}
 
 					this._oDialogAddUlu.then(function (oDialog) {
-						oDialog.setRememberSelections(false);
+						oDialog.setRememberSelections(true);
 						oDialog.open();
 					}.bind(this));
+				} else {
+					if (uluList.length === 1) {
+						this.getUIControl("inpUluValueHelp").addToken(new Token({
+							//text: oItem.getTitle()
+							text: uluList[0].ULU_T,
+							key: uluList[0].ULU_C
+						}));
+					}
 				}
 			}
 		},
 
 		handleConfirmUlu: function (oEvent) {
-
 			this.getUIControl("inpUluValueHelp").removeAllTokens();
 			this.getUIControl("inpFdluValueHelp").removeAllTokens();
 			var aContexts = oEvent.getParameter("selectedContexts");
@@ -486,7 +531,6 @@ sap.ui.define([
 		},
 
 		handleSearchUlu: function (oEvent) {
-
 			var claimAuthorizations = this.AppModel.getProperty("/claimAuthorizations");
 			var uluList = [];
 			var isUluRepeated;
@@ -548,7 +592,7 @@ sap.ui.define([
 						if (!that._oDialogAddUlu) {
 							that._oDialogAddUlu = Fragment.load({
 								id: oView.getId(),
-								name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.UluValueHelpDialog",
+								name: "nus.edu.sg.cw_detailedreport.fragment.UluValueHelpDialog",
 								controller: that
 							}).then(function (oDialog) {
 								oView.addDependent(oDialog);
@@ -601,7 +645,7 @@ sap.ui.define([
 					if (!this._oDialogAddUlu) {
 						this._oDialogAddUlu = Fragment.load({
 							id: oView.getId(),
-							name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.UluValueHelpDialog",
+							name: "nus.edu.sg.cw_detailedreport.fragment.UluValueHelpDialog",
 							controller: this
 						}).then(function (oDialog) {
 							oView.addDependent(oDialog);
@@ -701,7 +745,7 @@ sap.ui.define([
 				if (!this._oDialogAddFdlu) {
 					this._oDialogAddFdlu = Fragment.load({
 						id: oView.getId(),
-						name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.FdluValueHelpDialog",
+						name: "nus.edu.sg.cw_detailedreport.fragment.FdluValueHelpDialog",
 						controller: this
 					}).then(function (oDialog) {
 						oView.addDependent(oDialog);
@@ -710,9 +754,16 @@ sap.ui.define([
 				}
 
 				this._oDialogAddFdlu.then(function (oDialog) {
-					oDialog.setRememberSelections(false);
+					oDialog.setRememberSelections(true);
 					oDialog.open();
 				}.bind(this));
+			} else {
+				if (fdluList.length === 1) {
+					this.getUIControl("inpFdluValueHelp").addToken(new Token({
+						text: fdluList[0].FDLU_T,
+						key: fdluList[0].FDLU_C
+					}));
+				}
 			}
 
 		},
@@ -819,7 +870,7 @@ sap.ui.define([
 				if (!this._oDialogAddFdlu) {
 					this._oDialogAddFdlu = Fragment.load({
 						id: oView.getId(),
-						name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.FdluValueHelpDialog",
+						name: "nus.edu.sg.cw_detailedreport.fragment.FdluValueHelpDialog",
 						controller: this
 					}).then(function (oDialog) {
 						oView.addDependent(oDialog);
@@ -828,7 +879,7 @@ sap.ui.define([
 				}
 
 				this._oDialogAddFdlu.then(function (oDialog) {
-					oDialog.setRememberSelections(false);
+					oDialog.setRememberSelections(true);
 					oDialog.open();
 				}.bind(this));
 			}
@@ -836,13 +887,13 @@ sap.ui.define([
 		},
 
 		handleSelectionFinishFdlu: function (oEvent) {
-			//	debugger;
+
 			var selectedItems = oEvent.getParameter("selectedItems");
 			this.AppModel.setProperty("/claimRequest/selectedItemsFdlu", selectedItems);
 		},
 
 		handleConfirmUluFdlu: function (oEvent) {
-			//	debugger;
+
 			// reset the filter
 			var oBinding = oEvent.getSource().getBinding("items");
 			oBinding.filter([]);
@@ -865,7 +916,7 @@ sap.ui.define([
 		},
 
 		handleValueHelpStatus: function (oEvent) {
-			//debugger;
+
 			var oDataModel = this.getOwnerComponent().getModel("EclaimSrvModel");
 			var aFilters = [];
 
@@ -879,7 +930,7 @@ sap.ui.define([
 				filters: aFilters,
 				success: function (oData) {
 					if (oData) {
-						//that.AppModel.setProperty("/claimRequest/statusList", oData.results);
+						//	that.AppModel.setProperty("/claimRequest/statusList", oData.results);
 						//to remove duplicate status description
 						var aStatusDescListSet = [];
 						if (oData.results && oData.results.length) {
@@ -914,13 +965,13 @@ sap.ui.define([
 		},
 
 		handleSelectionFinishClaimStatus: function (oEvent) {
-			//	debugger;
+
 			var selectedItems = oEvent.getParameter("selectedItems");
 			this.AppModel.setProperty("/claimRequest/selectedItemsClaimStatus", selectedItems);
 		},
 
 		handleConfirmStatus: function (oEvent) {
-			//	debugger;
+
 			var oBinding = oEvent.getSource().getBinding("items");
 			oBinding.filter([]);
 
@@ -941,12 +992,11 @@ sap.ui.define([
 		},
 
 		handleSearchStatus: function (oEvent) {
-			//	debugger;
 
 		},
 
 		// handleValueHelpStaffId: function (oEvent) {
-		// 	debugger;
+
 		// 	var oView = this.getView();
 		// 	//var oButton = oEvent.getSource();
 		// 	var token = this.AppModel.getProperty("/token");
@@ -984,18 +1034,18 @@ sap.ui.define([
 		// },
 
 		handleSelectionFinishStaffId: function (oEvent) {
-			//	debugger;
+
 			var selectedItemsStaffId = oEvent.getParameter("selectedItems");
 			this.AppModel.setProperty("/claimRequest/selectedItemsStaffId", selectedItemsStaffId);
 		},
-		handleValueHelpStaffId: function (oEvent) {
 
+		handleValueHelpStaffId: function (oEvent) {
 			var oDataModel = this.getOwnerComponent().getModel("EclaimSrvModel");
 			//var aFilters = [];
 			var aFilter = [];
 			var orFilter = [];
 			var andFilter = [];
-			//	debugger;
+
 			//	var uluList = this.AppModel.getProperty("/claimRequest/UluList");
 			var userRoleGrp = this.AppModel.getProperty("/userRoleGrp"); //Super Admin
 			if (userRoleGrp !== "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
@@ -1016,14 +1066,16 @@ sap.ui.define([
 			if (userRoleGrp !== "NUS_CHRS_ECLAIMS_SUPER_ADMIN" || (!!claimAuthorizations && claimAuthorizations.length > 0)) {
 				var that = this;
 				this.showBusyIndicator();
-				oDataModel.read("/ChrsJobInfos", {
-					filters: aFilter,
+				// oDataModel.read("/ChrsJobInfos", {
+				oDataModel.read("/StaffListViews", {
+
+					// filters: aFilter,
 					urlParameters: {
 						"$select": "STF_NUMBER,FULL_NM"
 					},
 					success: function (oData) {
 						if (oData) {
-							//	debugger;
+
 							that.AppModel.setProperty("/claimRequest/staffLength", oData.results.length);
 							that.AppModel.setProperty("/claimRequest/StaffIdList", oData.results);
 							that.AppModel.setProperty("/claimRequest/originalStaffIdList", oData.results);
@@ -1031,7 +1083,7 @@ sap.ui.define([
 							// if (!that._oDialogAddStaff) {
 							// 	that._oDialogAddStaff = Fragment.load({
 							// 		id: oView.getId(),
-							// 		name: "nus.edu.sg.pttdetailedreport.fragment.StaffValueHelpDialog",
+							// 		name: "nus.edu.sg.cw_detailedreport.fragment.StaffValueHelpDialog",
 							// 		controller: that
 							// 	}).then(function (oDialog) {
 							// 		oView.addDependent(oDialog);
@@ -1071,7 +1123,7 @@ sap.ui.define([
 			if (!this._oDialogAddStaff) {
 				this._oDialogAddStaff = Fragment.load({
 					id: oView.getId(),
-					name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.StaffValueHelpDialog",
+					name: "nus.edu.sg.cw_detailedreport.fragment.StaffValueHelpDialog",
 					controller: this
 				}).then(function (oDialog) {
 					oView.addDependent(oDialog);
@@ -1080,17 +1132,13 @@ sap.ui.define([
 			}
 
 			this._oDialogAddStaff.then(function (oDialog) {
-				oDialog.setRememberSelections(false);
+				oDialog.setRememberSelections(true);
 				oDialog.open();
 			});
 		},
 
 		handleConfirmStaff: function (oEvent) {
 
-			// reset the filter
-			//	debugger;
-			// var oBinding = oEvent.getSource().getBinding("items");
-			// oBinding.filter([]);
 			this.getUIControl("inpStaffValueHelp").removeAllTokens();
 			var aContexts = oEvent.getParameter("selectedContexts");
 			if (aContexts && aContexts.length) {
@@ -1184,7 +1232,8 @@ sap.ui.define([
 			if (!!uluFdluFilter) {
 				//var uluFdluFilter1 = uluFdluFilter;
 				filtersGrp = new Filter({
-					filters: [filtersStaffGrp, uluFdluFilter],
+					// filters: [filtersStaffGrp, uluFdluFilter],
+					filters: [filtersStaffGrp],
 					and: true
 				});
 			} else {
@@ -1194,7 +1243,7 @@ sap.ui.define([
 			if (sValue && (userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN" || (!!claimAuthorizations && claimAuthorizations.length > 0))) {
 				var that = this;
 
-				oDataModel.read("/ChrsJobInfos", {
+				oDataModel.read("/StaffListViews", {
 					filters: [filtersGrp],
 					urlParameters: {
 						"$select": "STF_NUMBER,FULL_NM"
@@ -1226,7 +1275,7 @@ sap.ui.define([
 			}
 		},
 
-		handleValueHelpPeriod: function (oEvent) {
+		/*handleValueHelpPeriod: function (oEvent) {
 			var currentDate = new Date();
 			var currentYear = currentDate.getFullYear();
 			//var currentMonth = currentDate.getMonth();
@@ -1244,6 +1293,54 @@ sap.ui.define([
 				monthListSet.push(monthListSetItem);
 			}
 			this.AppModel.setProperty("/monthList", monthListSet);
+		},*/
+		handleValueHelpPeriod: function (oEvent) {
+			var currentDate = new Date();
+			var currentYear = currentDate.getFullYear();
+			var monthListSet = [];
+
+			// Fetching 12 months in the past
+			/*	for (var i = 0; i < 13; i++) {
+					var pastMonth = new Date(currentDate);
+					pastMonth.setMonth(currentDate.getMonth() - i);
+					var monthname = this.AppModel.getProperty("/monthNames")[pastMonth.getMonth()];
+					var monthListSetItem = {
+						monthCode: pastMonth.getFullYear() + '-' + (pastMonth.getMonth() + 1),
+						monthName: monthname + ',' + ' ' + pastMonth.getFullYear()
+					};
+					monthListSet.push(monthListSetItem);
+				}*/
+			var monthNames = [
+				"January", "February", "March", "April", "May", "June",
+				"July", "August", "September", "October", "November", "December"
+			];
+			var currentDate = new Date();
+			var months = [];
+			for (var i = 12; i >= 1; i--) {
+				var lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+				var formattedLastMonth = new Intl.DateTimeFormat('en-US', {
+					year: 'numeric',
+					month: '2-digit'
+				}).format(lastMonth);
+				formattedLastMonth = formattedLastMonth.split("/");
+				months.push({
+					"monthCode": formattedLastMonth[1] + '-' + formattedLastMonth[0],
+					"monthName": monthNames[parseInt(formattedLastMonth[0]) - 1] + ',' + ' ' + formattedLastMonth[1]
+				});
+			}
+
+			var currentMonth = new Intl.DateTimeFormat('en-US', {
+				year: 'numeric',
+				month: '2-digit'
+			}).format(currentDate);
+			currentMonth = currentMonth.split("/");
+			months.push({
+				"monthCode": currentMonth[1] + '-' + currentMonth[0],
+				"monthName": monthNames[parseInt(currentMonth[0]) - 1] + ',' + ' ' + currentMonth[1]
+			});
+			months.reverse();
+			this.AppModel.setProperty("/monthList", months);
+
 		},
 
 		handleValueHelpVerifier: function (oEvent) {
@@ -1255,7 +1352,7 @@ sap.ui.define([
 			var aFilter = [];
 			var orFilter = [];
 			var andFilter = [];
-			//	debugger;
+
 			var userRoleGrp = this.AppModel.getProperty("/userRoleGrp"); //Super Admin
 			//	var uluList = this.AppModel.getProperty("/claimRequest/UluList");
 			//	var uluList = this.AppModel.getProperty("/claimRequest/UluList");
@@ -1287,7 +1384,9 @@ sap.ui.define([
 			//add the check for validity 
 			var currentDate = new Date();
 			aFilter.push(new sap.ui.model.Filter("APM_VALID_FROM", FilterOperator.LE, currentDate));
-			aFilter.push(new sap.ui.model.Filter("APM_VALID_TO", FilterOperator.GE, currentDate));			
+			aFilter.push(new sap.ui.model.Filter("APM_VALID_TO", FilterOperator.GE, currentDate));
+			//			
+			//aFilter.push(new sap.ui.model.Filter("STAFF_USER_GRP", FilterOperator.EQ, ['VERIFIER']));
 			// andFilter.push(new sap.ui.model.Filter("ULU", FilterOperator.EQ, ulu));
 			// andFilter.push(new sap.ui.model.Filter("FDLU", FilterOperator.EQ, fdlu));
 			//aFilter.push(new sap.ui.model.Filter(andFilter, true));
@@ -1300,7 +1399,7 @@ sap.ui.define([
 							if (!this._oDialogVerifer) {
 								this._oDialogVerifer = Fragment.load({
 									id: oView.getId(),
-									name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.VerifierValueHelpDialog",
+									name: "nus.edu.sg.cw_detailedreport.fragment.VerifierValueHelpDialog",
 									controller: this
 								}).then(function (oDialog) {
 									oView.addDependent(oDialog);
@@ -1412,12 +1511,12 @@ sap.ui.define([
 			if (!!uluFdluFilter) {
 
 				filtersGrp = new Filter({
-					filters: [filtersApproverGrp, uluFdluFilter, staffUserGroup,  validityFromFilter, validityToFilter],
+					filters: [filtersApproverGrp, uluFdluFilter, staffUserGroup, validityFromFilter, validityToFilter],
 					and: true
 				});
 			} else {
 				filtersGrp = new Filter({
-					filters: [filtersApproverGrp, staffUserGroup,  validityFromFilter, validityToFilter],
+					filters: [filtersApproverGrp, staffUserGroup, validityFromFilter, validityToFilter],
 					and: true
 				});
 			}
@@ -1468,7 +1567,7 @@ sap.ui.define([
 			var currentDate = new Date();
 			aFilter.push(new sap.ui.model.Filter("APM_VALID_FROM", FilterOperator.LE, currentDate));
 			aFilter.push(new sap.ui.model.Filter("APM_VALID_TO", FilterOperator.GE, currentDate));
-			//				
+			//					
 			if (userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN" || (!!claimAuthorizations && claimAuthorizations.length > 0)) {
 				EclaimSrvModel.read("/EclaimsApprovalMatrixViews", {
 					filters: aFilter,
@@ -1478,7 +1577,7 @@ sap.ui.define([
 							if (!this._oDialogApprover) {
 								this._oDialogApprover = Fragment.load({
 									id: oView.getId(),
-									name: "nus.edu.consolidatedreport.claimconsolidatereport.fragment.ApproverValueHelpDialog",
+									name: "nus.edu.sg.cw_detailedreport.fragment.ApproverValueHelpDialog",
 									controller: this
 								}).then(function (oDialog) {
 									oView.addDependent(oDialog);
@@ -1501,39 +1600,89 @@ sap.ui.define([
 			}
 		},
 
+		handleValueHelpApproverOT: function (oEvent) {
+			var oView = this.getView();
+			var EclaimSrvModel = this.getComponentModel("EclaimSrvModel");
+			var aFilter = [];
+			var orFilter = [];
+			var andFilter = [];
+			var userRoleGrp = this.AppModel.getProperty("/userRoleGrp"); //Super Admin
+			aFilter.push(new sap.ui.model.Filter("PROCESS_CODE", FilterOperator.EQ, '102'));
+			EclaimSrvModel.read("/otApproverListss", {
+				filters: aFilter,
+				success: function (oData) {
+					if (oData.results.length) {
+						this.AppModel.setProperty("/Approver", oData.results);
+						if (!this._oDialogApprover) {
+							this._oDialogApprover = Fragment.load({
+								id: oView.getId(),
+								name: "nus.edu.sg.cw_detailedreport.fragment.ApproverValueHelpDialog",
+								controller: this
+							}).then(function (oDialog) {
+								oView.addDependent(oDialog);
+								return oDialog;
+							});
+						}
+
+						this._oDialogApprover.then(function (oDialog) {
+							oDialog.setRememberSelections(true);
+							oDialog.open();
+						}.bind(this));
+					} else {
+
+					}
+				}.bind(this),
+				error: function (oError) {
+
+				}
+			});
+		},
+
 		handleConfirmApprover: function (oEvent) {
 			// reset the filter
 			var oBinding = oEvent.getSource().getBinding("items");
 			oBinding.filter([]);
-
+			this.getUIControl("inpApproverValueHelp").removeAllTokens();
 			var aContexts = oEvent.getParameter("selectedContexts");
-			if (aContexts && aContexts.length) {
+			/*if (aContexts && aContexts.length) {
 				var sPath = aContexts[0].getPath();
 				var objSelectedApprover = this.AppModel.getProperty(sPath);
 				var objApprover = {
-					"STAFF_ID": objSelectedApprover.STAFF_ID,
-					"NUSNET_ID": objSelectedApprover.STAFF_NUSNET_ID,
-					"ULU": objSelectedApprover.ULU,
-					"FDLU": objSelectedApprover.FDLU,
+					"STAFF_ID": objSelectedApprover.TASK_ASSGN_TO_STF_NUMBER,
+					"NUSNET_ID": objSelectedApprover.TASK_ASSGN_TO,
+					// "ULU": objSelectedApprover.ULU,
+					// "FDLU": objSelectedApprover.FDLU,
 					"STAFF_FULL_NAME": objSelectedApprover.FULL_NM
 				};
 
 				//	this.AppModel.setProperty("/claimRequest/createClaimRequest/VERIFIER", [objVerifier]);
-				this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_ID", objSelectedApprover.STAFF_ID);
-				this.AppModel.setProperty("/claimRequest/APPROVER_NUSNET_ID", objSelectedApprover.STAFF_NUSNET_ID);
-				this.AppModel.setProperty("/claimRequest/APPROVER_ULU", objSelectedApprover.ULU);
-				this.AppModel.setProperty("/claimRequest/APPROVER_FDLU", objSelectedApprover.FDLU);
+				this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_ID", objSelectedApprover.TASK_ASSGN_TO_STF_NUMBER);
+				this.AppModel.setProperty("/claimRequest/APPROVER_NUSNET_ID", objSelectedApprover.TASK_ASSGN_TO);
+				// this.AppModel.setProperty("/claimRequest/APPROVER_ULU", objSelectedApprover.ULU);
+				// this.AppModel.setProperty("/claimRequest/APPROVER_FDLU", objSelectedApprover.FDLU);
 				this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_FULL_NAME", objSelectedApprover.FULL_NM);
 				this._fnAddToken(this.getUIControl("inpApproverValueHelp"), objSelectedApprover.STAFF_NUSNET_ID, objSelectedApprover.FULL_NM);
+			}*/
+
+			if (aContexts && aContexts.length) {
+				for (var i = 0; i < aContexts.length; i++) {
+					var sPath = aContexts[i].getPath();
+					var objSelectedStaff = this.AppModel.getProperty(sPath);
+					this.getUIControl("inpApproverValueHelp").addToken(new Token({
+						text: objSelectedStaff.FULL_NM,
+						key: objSelectedStaff.TASK_ASSGN_TO_STF_NUMBER
+					}));
+				}
 			}
+
 		},
 
 		onTokenUpdateApprover: function (oEvent) {
 			if (oEvent.getParameter("type") === "removed") {
 				this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_ID", "");
 				this.AppModel.setProperty("/claimRequest/APPROVER_NUSNET_ID", "");
-				this.AppModel.setProperty("/claimRequest/APPROVER_ULU", "");
-				this.AppModel.setProperty("/claimRequest/APPROVER_FDLU", "");
+				// this.AppModel.setProperty("/claimRequest/APPROVER_ULU", "");
+				// this.AppModel.setProperty("/claimRequest/APPROVER_FDLU", "");
 				this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_FULL_NAME", "");
 			}
 		},
@@ -1544,7 +1693,7 @@ sap.ui.define([
 			var andFilter = [];
 			var sValue = oEvent.getParameter("value").toString();
 			var userRoleGrp = this.AppModel.getProperty("/userRoleGrp"); //Super Admin
-			if (userRoleGrp !== "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
+			/*if (userRoleGrp !== "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
 				var claimAuthorizations = this.AppModel.getProperty("/claimAuthorizations");
 				if (claimAuthorizations) {
 					for (var i = 0; i < claimAuthorizations.length; i++) {
@@ -1559,27 +1708,27 @@ sap.ui.define([
 					filters: orFilter,
 					and: false
 				});
-			}
+			}*/
 
 			var filterStaffId = new sap.ui.model.Filter("STAFF_ID", sap.ui.model.FilterOperator.Contains, sValue);
 			var filterStaffNusNetId = new sap.ui.model.Filter("STAFF_NUSNET_ID", sap.ui.model.FilterOperator.Contains, sValue);
-			var filterUlu = new sap.ui.model.Filter("ULU", sap.ui.model.FilterOperator.Contains, sValue);
-			var filterFdlu = new sap.ui.model.Filter("FDLU", sap.ui.model.FilterOperator.Contains, sValue);
+			// var filterUlu = new sap.ui.model.Filter("ULU", sap.ui.model.FilterOperator.Contains, sValue);
+			// var filterFdlu = new sap.ui.model.Filter("FDLU", sap.ui.model.FilterOperator.Contains, sValue);
 			var filterStaffName = new sap.ui.model.Filter("FULL_NM", sap.ui.model.FilterOperator.Contains, sValue);
 
 			var filtersApproverGrp = new Filter({
-				filters: [filterStaffId, filterStaffNusNetId, filterUlu, filterFdlu, filterStaffName],
+				filters: [filterStaffId, filterStaffNusNetId, filterStaffName],
 				and: false
 			});
 
-			var staffUserGroup = new sap.ui.model.Filter("STAFF_USER_GRP", FilterOperator.EQ, ['APPROVER']);
+			var staffUserGroup = new sap.ui.model.Filter("TASK_NAME", FilterOperator.EQ, ['REPORTING_MGR']);
 			//add the check for validity 
-			var currentDate = new Date();
-			var validityFromFilter = new sap.ui.model.Filter("APM_VALID_FROM", FilterOperator.LE, currentDate);
-			var validityToFilter = new sap.ui.model.Filter("APM_VALID_TO", FilterOperator.GE, currentDate);
-			//	
+			// var currentDate = new Date();
+			// var validityFromFilter = new sap.ui.model.Filter("APM_VALID_FROM", FilterOperator.LE, currentDate);
+			// var validityToFilter = new sap.ui.model.Filter("APM_VALID_TO", FilterOperator.GE, currentDate);
+			//		
 			var filtersGrp;
-			if (!!uluFdluFilter) {
+			/*if (!!uluFdluFilter) {
 
 				filtersGrp = new Filter({
 					filters: [filtersApproverGrp, uluFdluFilter, staffUserGroup, validityFromFilter, validityToFilter],
@@ -1590,44 +1739,74 @@ sap.ui.define([
 					filters: [filtersApproverGrp, staffUserGroup, validityFromFilter, validityToFilter],
 					and: true
 				});
-			}
+			}*/
 
-			if (userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN" || (!!claimAuthorizations && claimAuthorizations.length > 0)) {
-				var that = this;
+			filtersGrp = new Filter({
+				filters: [filtersApproverGrp, staffUserGroup],
+				and: true
+			});
 
-				oDataModel.read("/EclaimsApprovalMatrixViews", {
-					filters: [filtersGrp],
-					// urlParameters: {
-					// 	"$select": "STF_NUMBER,FULL_NM"
-					// },
-					success: function (oData) {
-						//  
-						if (oData) {
-							that.AppModel.setProperty("/Approver", oData.results);
+			/*	if (userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN" || (!!claimAuthorizations && claimAuthorizations.length > 0)) {
+					var that = this;
+
+					oDataModel.read("/EclaimsApprovalMatrixViews", {
+						filters: [filtersGrp],
+						// urlParameters: {
+						// 	"$select": "STF_NUMBER,FULL_NM"
+						// },
+						success: function (oData) {
+							//  
+							if (oData) {
+								that.AppModel.setProperty("/Approver", oData.results);
+							}
+						},
+						error: function (oError) {
+
 						}
-					},
-					error: function (oError) {
+					});
+				}*/
 
+			oDataModel.read("/otApproverListss", {
+				filters: [filtersGrp],
+				// urlParameters: {
+				// 	"$select": "STF_NUMBER,FULL_NM"
+				// },
+				success: function (oData) {
+					//  
+					if (oData) {
+						this.AppModel.setProperty("/Approver", oData.results);
 					}
-				});
-			}
+				}.bind(this),
+				error: function (oError) {
+
+				}
+			});
 		},
 
 		onSearch: function (oEvent) {
-			//	debugger;
-			//			
-			//if (this.AppModel.getProperty("/claimRequest/UluList").length > 0) {
-
-			//return aFilter;
 			this.searchFilter();
 			var aFilter = this.AppModel.getProperty("/aSearchFilter");
-			//if (!!aFilter && aFilter.length > 0) {
-			var errorFlag = this.AppModel.getProperty("/errorFlag");
-			if (!errorFlag) {
+			var aSorter = [];
+			var oSorterRequestId = new sap.ui.model.Sorter({
+				path: "REQUEST_ID",
+				descending: true
+			});
+			aSorter.push(oSorterRequestId);
+			var oSorterClaimWeekNo = new sap.ui.model.Sorter({
+				path: "CLAIM_WEEK_NO",
+				descending: false
+			});
+			aSorter.push(oSorterClaimWeekNo);
+			var oSorterStartDate = new sap.ui.model.Sorter({
+				path: "CLAIM_START_DATE",
+				descending: false
+			});
+			aSorter.push(oSorterStartDate);
+			if (!!aFilter && aFilter.length > 0) {
 				var oClaimsReqTable = this.getView().byId("idClaimRequestsTable");
 				oClaimsReqTable.bindItems({
-					path: "EclaimSrvModel>/EclaimItemConsViews",
-					//	sorter: oSorter,
+					path: "EclaimSrvModel>/EclaimsItemViews",
+					sorter: aSorter,
 					template: this.oTemplate,
 					filters: aFilter
 						// parameters: {
@@ -1641,13 +1820,10 @@ sap.ui.define([
 		},
 
 		searchFilter: function (oEvent) {
-
 			var userRoleGrp = this.AppModel.getProperty("/userRoleGrp"); //Super Admin
-			this.AppModel.setProperty("/errorFlag", '');
-			var uluList = this.AppModel.getProperty("/claimRequest/UluList");
 			//check whether the mandatory search criteria is provided or not
-			//	if (this.AppModel.getProperty("/claimRequest/UluList").length > 0 || userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
-			if ((!!uluList && !!uluList.length > 0) || userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
+			if (this.AppModel.getProperty("/claimRequest/UluList").length > 0 || userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
+				//if (userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
 				//var selectedItemsUlu = this.AppModel.getProperty("/claimRequest/selectedItemsUlu");
 				var selectedItemsUlu = this.getUIControl("inpUluValueHelp").getTokens();
 				if (!!selectedItemsUlu && selectedItemsUlu.length > 0) {
@@ -1673,11 +1849,10 @@ sap.ui.define([
 					//			var status = this.AppModel.getProperty("/status");
 					var selectedItemsStatus = this.AppModel.getProperty("/claimRequest/selectedItemsClaimStatus");
 
-					//	var selectedItemsFdlu = this.AppModel.getProperty("/claimRequest/selectedItemsFdlu");
+					//var selectedItemsFdlu = this.AppModel.getProperty("/claimRequest/selectedItemsFdlu");
 					var selectedItemsFdlu = this.getUIControl("inpFdluValueHelp").getTokens();
 					//	var selectedItemsClaimNo = this.AppModel.getProperty("/claimRequest/selectedItemsClaimNo");
 					//	var selectedItemsStaffId = this.AppModel.getProperty("/claimRequest/selectedItemsStaffId");
-
 					var selectedItemsStaffId = this.getUIControl("inpStaffValueHelp").getTokens();
 					var selectedItemsClaimNo = this.getUIControl("inpClaimNoValueHelp").getTokens();
 					var claimType = this.AppModel.getProperty("/claimTypeCode");
@@ -1690,10 +1865,11 @@ sap.ui.define([
 					var submittedBy = this.AppModel.getProperty("/submittedById");
 					var startMonth = this.AppModel.getProperty("/startMonth");
 					var endMonth = this.AppModel.getProperty("/endMonth");
-					// var fromRateAmount = this.AppModel.getProperty("/fromRateAmount");
-					// var toRateAmount = this.AppModel.getProperty("/toRateAmount");
+					var fromRateAmount = this.AppModel.getProperty("/fromRateAmount");
+					var toRateAmount = this.AppModel.getProperty("/toRateAmount");
 					var verifierStaffId = this.AppModel.getProperty("/claimRequest/VERIFIER_STAFF_ID");
-					var approverStaffId = this.AppModel.getProperty("/claimRequest/APPROVER_STAFF_ID");
+					// var approverStaffId = this.AppModel.getProperty("/claimRequest/APPROVER_STAFF_ID"); 
+					var approverStaffId = this.getUIControl("inpApproverValueHelp").getTokens();
 					//VERIFIER_STAFF_ID
 					var aFilter = [];
 					var andFilter = [];
@@ -1741,7 +1917,6 @@ sap.ui.define([
 
 					// }			
 					//If the ULU is passed as the selection criteria 
-					//If the ULU is passed as the selection criteria 
 					if (!!selectedItemsUlu && selectedItemsUlu.length > 0) {
 						//andFilter.push(new sap.ui.model.Filter("ULU", FilterOperator.EQ, ulu));
 						if (userRoleGrp === "NUS_CHRS_ECLAIMS_SUPER_ADMIN" && this.AppModel.getProperty("/claimRequest/UluList").length ===
@@ -1776,18 +1951,18 @@ sap.ui.define([
 						//andFilter.push(new sap.ui.model.Filter("ULU", FilterOperator.EQ, ulu));
 						var orFilter = [];
 						for (var i = 0; i < selectedItemsFdlu.length; i++) {
-							orFilter.push(new sap.ui.model.Filter("FDLU", FilterOperator.EQ, selectedItemsFdlu[i].getProperty("key")));
+							orFilter.push(new sap.ui.model.Filter("FDLU_C", FilterOperator.EQ, selectedItemsFdlu[i].getProperty("key")));
 						}
 						andFilter.push(new sap.ui.model.Filter(orFilter, false));
 					} else if (!!selectedItemsUlu && selectedItemsUlu.length > 0 && userRoleGrp !== "NUS_CHRS_ECLAIMS_SUPER_ADMIN") {
 						var claimAuthorizations = this.AppModel.getProperty("/claimAuthorizations");
-						//var uluList = this.AppModel.getProperty("/claimRequest/UluList");
+						var uluList = this.AppModel.getProperty("/claimRequest/UluList");
 						var orFilter = [];
 						for (var i = 0; i < selectedItemsUlu.length; i++) {
 							for (var j = 0; j < claimAuthorizations.length; j++) {
 								//	for (var j = 0; j < uluList.length; j++) {
 								if (selectedItemsUlu[i].getProperty("key") === claimAuthorizations[j].ULU_C) {
-									orFilter.push(new sap.ui.model.Filter("FDLU", FilterOperator.EQ, claimAuthorizations[j].FDLU_C));
+									orFilter.push(new sap.ui.model.Filter("FDLU_C", FilterOperator.EQ, claimAuthorizations[j].FDLU_C));
 									//continue;
 								}
 							}
@@ -1807,21 +1982,28 @@ sap.ui.define([
 						andFilter.push(new sap.ui.model.Filter(orFilter, false));
 						//andFilter.push(new sap.ui.model.Filter("SUBMITTED_BY_NID", FilterOperator.EQ, submittedBy));
 					}
-					// if (fromRateAmount) {
-					// 	andFilter.push(new sap.ui.model.Filter("RATE_TYPE_AMOUNT", FilterOperator.GE, fromRateAmount));
-					// }
+					if (fromRateAmount) {
+						andFilter.push(new sap.ui.model.Filter("RATE_TYPE_AMOUNT", FilterOperator.GE, fromRateAmount));
+					}
 
-					// if (toRateAmount) {
-					// 	andFilter.push(new sap.ui.model.Filter("RATE_TYPE_AMOUNT", FilterOperator.LE, toRateAmount));
-					// }
+					if (toRateAmount) {
+						andFilter.push(new sap.ui.model.Filter("RATE_TYPE_AMOUNT", FilterOperator.LE, toRateAmount));
+					}
 
 					if (verifierStaffId) {
 						andFilter.push(new sap.ui.model.Filter("VERIFIER_STAFF_ID", FilterOperator.EQ, verifierStaffId));
 					}
 
-					if (approverStaffId) {
-						//andFilter.push(new sap.ui.model.Filter("APPROVED_BY", FilterOperator.EQ, approverStaffId));
-						andFilter.push(new sap.ui.model.Filter("APPROVER_STAFF_ID", FilterOperator.EQ, approverStaffId));
+					// if (approverStaffId) {
+					// 	andFilter.push(new sap.ui.model.Filter("APPROVED_BY", FilterOperator.EQ, approverStaffId));
+					// }
+
+					if (!!approverStaffId && approverStaffId.length > 0) {
+						var orFilter = [];
+						for (var i = 0; i < approverStaffId.length; i++) {
+							orFilter.push(new sap.ui.model.Filter("APPROVED_BY", FilterOperator.EQ, approverStaffId[i].getProperty("key")));
+						}
+						andFilter.push(new sap.ui.model.Filter(orFilter, false));
 					}
 
 					if (startMonth && endMonth) {
@@ -1874,39 +2056,53 @@ sap.ui.define([
 					}
 
 					//handling is deleted flag
-					//	andFilter.push(new sap.ui.model.Filter("IS_DELETED", FilterOperator.EQ, "N"));
+					andFilter.push(new sap.ui.model.Filter("IS_DELETED", FilterOperator.EQ, "N"));
 					//Only for PTT Claim Types
-						andFilter.push(new sap.ui.model.Filter("CLAIM_TYPE", FilterOperator.EQ, "101"));
-						
+					andFilter.push(new sap.ui.model.Filter("PROCESS_CODE", FilterOperator.EQ, "102"));
+
 					if (andFilter.length) {
 						aFilter.push(new sap.ui.model.Filter(andFilter, true));
 					}
 					this.AppModel.setProperty("/aSearchFilter", aFilter);
 				} else {
-					MessageBox.error("Please provide the ULU in order to execute the report!!");
-					this.AppModel.setProperty("/errorFlag", 'X');
+					MessageBox.error("Please provide the ULU in order to execute the report!");
 				}
 			} else {
 				MessageBox.error("No ULU and FDLU assigned in the approver matrix for the logged in user");
-				this.AppModel.setProperty("/errorFlag", 'X');
 			}
 		},
 		//
 		onDataExport: function (oEvent) {
-			//	debugger;
 			//	if (this.AppModel.getProperty("/claimRequest/UluList").length > 0) {
 			var oDataModel = this.getOwnerComponent().getModel("EclaimSrvModel");
 			this.searchFilter();
+			var aSorter = [];
+			var oSorterRequestId = new sap.ui.model.Sorter({
+				path: "REQUEST_ID",
+				descending: true
+			});
+			aSorter.push(oSorterRequestId);
+			var oSorterClaimWeekNo = new sap.ui.model.Sorter({
+				path: "CLAIM_WEEK_NO",
+				descending: false
+			});
+			aSorter.push(oSorterClaimWeekNo);
+			var oSorterStartDate = new sap.ui.model.Sorter({
+				path: "CLAIM_START_DATE",
+				descending: false
+			});
+			aSorter.push(oSorterStartDate);
 			var aFilter = this.AppModel.getProperty("/aSearchFilter");
-			//if (!!aFilter && aFilter.length > 0) {
-			var errorFlag = this.AppModel.getProperty("/errorFlag");
-			if (!errorFlag) {
+			if (!!aFilter && aFilter.length > 0) {
 				//this._fnHandleDataToExport(oData.results);
-				oDataModel.read("/EclaimItemConsViews", {
+				oDataModel.read("/EclaimsItemViews", {
 					filters: [aFilter],
+					sorters: aSorter,
 					success: function (oData) {
-						if (oData) {
+						if (oData.results.length) {
 							this._fnHandleDataToExport(oData.results);
+						} else {
+							MessageBox.error("There are no records to download for the provided filters..!");
 						}
 					}.bind(this),
 					error: function (oError) {}
@@ -1919,19 +2115,24 @@ sap.ui.define([
 		_fnHandleDataToExport: function (aData) {
 			var aCols, aProducts, oSettings, oSheet;
 			aCols = this.createColumnConfig();
-
+			aData = aData.map(function (item) {
+				item.IS_OPT_FOR_COMPENSATION = item.IS_PH === 5 ? "X" : "";
+				item.IS_PH = (item.IS_PH === 2 || item.IS_PH === 4 || item.IS_PH === 5) ? "X" : "";
+				item.APPOINTMENT_TRACK = item.APPOINTMENT_TRACK === 'EXEC' ? "EXEC" : "ADMIN";
+				return item;
+			});
 			oSettings = {
 				workbook: {
 					columns: aCols
 				},
 				dataSource: aData,
-				fileName: "PTT Consolidated Report.xlsx"
+				fileName: "CW Detailed Report.xlsx"
 			};
 
 			oSheet = new Spreadsheet(oSettings);
 			oSheet.build()
 				.then(function () {
-					MessageToast.show('PTT Consolidated Report exported successfully..!!');
+					MessageToast.show('CW Detailed Report exported successfully..!');
 				})
 				.finally(function () {
 					oSheet.destroy();
@@ -1959,13 +2160,7 @@ sap.ui.define([
 				}, {
 					label: 'Staff Name',
 					property: 'FULL_NM'
-				},
-				//{
-				// 	label: 'ULU',
-				// 	property: ['CLAIM_MONTH', 'CLAIM_YEAR'],
-				// 	template: '{0} / {1}'
-				// }, 
-				{
+				}, {
 					label: 'ULU Code',
 					property: 'ULU'
 				}, {
@@ -1973,61 +2168,168 @@ sap.ui.define([
 					property: 'ULU_T'
 				}, {
 					label: 'FDLU Code',
-					property: 'FDLU'
+					property: 'FDLU_C'
 				}, {
 					label: 'FDLU Name',
 					property: 'FDLU_T'
 				}, {
 					label: 'Employee Group',
-					property: 'EMPLOYEE_GRP'
+					property: 'EMP_GP_T'
 				}, {
 					label: 'Date Joined',
-					property: 'DATE_JOINED'
-						//type: EdmType.Date
+					property: 'DATE_JOINED',
+					type: EdmType.Date
 						// type: EdmType.Number,
 						// scale: 2
 				}, {
 					label: 'Rate Type',
 					property: 'RATE_DESC'
 				}, {
-					label: 'Hours / Unit',
+					label: 'Week No',
+					property: 'CLAIM_WEEK_NO'
+				}, {
+					label: 'Date',
+					property: 'CLAIM_START_DATE'
+						//	inputformat: "yyyy-mm-dd",
+						//	type: sap.ui.export.EdmType.Date
+				},
+				// {
+				// 	label: 'End Date',
+				// 	property: 'CLAIM_END_DATE'
+				// 		//inputformat: "yyyy-mm-dd",
+				// 		//type: sap.ui.export.EdmType.Date
+				// },
+				{
+					label: 'Day',
+					property: 'CLAIM_DAY'
+				}, {
+					label: 'Start Time',
+					property: 'START_TIME'
+				}, {
+					label: 'End Time',
+					property: 'END_TIME'
+				}, {
+					label: 'Hours/Unit',
 					property: 'HOURS_UNIT'
 				}, {
-					label: 'Total Amount',
-					property: 'TOTAL_AMOUNT'
+					label: 'PH',
+					property: 'IS_PH'
 				}, {
+					label: 'Day Type',
+					property: 'CLAIM_DAY_TYPE'
+				}, {
+					label: 'Opt For Compensation',
+					property: 'IS_OPT_FOR_COMPENSATION'
+				}, {
+					label: 'Rate Amount (applicable for Hourly CW)',
+					property: 'RATE_TYPE_AMOUNT'
+				},
+				// {
+				// 	label: 'Total Amount',
+				// 	property: 'TOTAL_AMOUNT'
+				// }, 
+				{
 					label: 'WBS',
 					property: 'WBS'
+				}, {
+					label: 'Claim Item Remarks',
+					property: 'REMARKS'
+				}, {
+					label: 'Submitted on',
+					property: 'SUBMITTED_ON',
+					type: EdmType.Date
+				}, {
+					label: 'Submitted by',
+					property: 'SUBMITTED_BY'
+				},
+				// {
+				// 	label: 'Verified on',
+				// 	property: 'VERIFIED_ON',
+				// 	type: EdmType.Date
+				// }, {
+				// 	label: 'Verified Staff ID',
+				// 	property: 'VERIFIER_STAFF_ID'
+				// }, {
+				// 	label: 'Verified By',
+				// 	property: 'VERIFIER_STAFF_FULL_NAME'
+				// }, {
+				// 	label: 'AP1 Staff ID',
+				// 	property: 'ADD_APP_1_STAFF_ID'
+				// }, {
+				// 	label: 'Additional Approver 1',
+				// 	property: 'ADD_APP_1_STAFF_FULL_NAME'
+				// }, {
+				// 	label: 'Additional Appr 1 approved on',
+				// 	property: 'ADD_APRV_1_ON',
+				// 	type: EdmType.Date
+				// }, {
+				// 	label: 'AP2 Staff ID',
+				// 	property: 'ADDITIONAL_APP_2_STAFF_ID'
+				// }, {
+				// 	label: 'Additional Approver 2',
+				// 	property: 'ADDITIONAL_APP_2_STAFF_FULL_NAME'
+				// }, {
+				// 	label: 'Additional Appr 2 approved on',
+				// 	property: 'ADD_APRV_2_ON',
+				// 	type: EdmType.Date
+				// },
+				{
+					label: 'Approved on',
+					property: 'APPROVED_ON',
+					type: EdmType.Date
+				}, {
+					label: 'Approver Staff ID',
+					property: 'APPROVED_BY'
+				}, {
+					label: 'Approved by',
+					property: 'APPROVER_STAFF_FULL_NAME'
+				}, {
+					label: 'CA Remarks',
+					property: 'CA_REMARKS'
+				},
+				{
+					label: 'Appointment Track',
+					property: 'APPOINTMENT_TRACK'
+				},
+				{
+					label: 'Approver Remarks',
+					property: 'APP_REMARKS'
 				}
+
 			];
 		},
 
 		onClear: function () {
-			
+
 			this.AppModel.setProperty("/claimRequest/selectedItemsClaimStatus", '');
 			this.getUIControl("inpClaimStatus").removeAllSelectedItems();
+			// this.AppModel.setProperty("/claimRequest/statusList/STATUS_CODE", '');
+			// this.AppModel.setProperty("/claimRequest/statusList/STATUS_DESC", '');
 			this.getUIControl("inpStaffValueHelp").removeAllTokens();
 			this.getUIControl("inpClaimNoValueHelp").removeAllTokens();
 			this.AppModel.setProperty("/startMonth", '');
-			this.AppModel.setProperty("/endMonth", '');		
+			this.AppModel.setProperty("/endMonth", '');
 			this.AppModel.setProperty("/submissionStartDate", '');
-			this.AppModel.setProperty("/submissionEndDate", '');			
+			this.AppModel.setProperty("/submissionEndDate", '');
 			this.getUIControl("inpUluValueHelp").removeAllTokens();
 			this.getUIControl("inpFdluValueHelp").removeAllTokens();
-			// this.AppModel.setProperty("/fromRateAmount", '');
-			// this.AppModel.setProperty("/toRateAmount", '');			
-			this.getUIControl("inpVerifierValueHelp").removeAllTokens();
+			this.AppModel.setProperty("/fromRateAmount", '');
+			this.AppModel.setProperty("/toRateAmount", '');
+			// this.getUIControl("inpVerifierValueHelp").removeAllTokens();
 			this.getUIControl("inpApproverValueHelp").removeAllTokens();
-				this.AppModel.setProperty("/claimRequest/VERIFIER_STAFF_ID", "");
-				this.AppModel.setProperty("/claimRequest/VERIFIER_NUSNET_ID", "");
-				this.AppModel.setProperty("/claimRequest/VERIFIER_ULU", "");
-				this.AppModel.setProperty("/claimRequest/VERIFIER_FDLU", "");
-				this.AppModel.setProperty("/claimRequest/VERIFIER_STAFF_FULL_NAME", "");
-				this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_ID", "");
-				this.AppModel.setProperty("/claimRequest/APPROVER_NUSNET_ID", "");
-				this.AppModel.setProperty("/claimRequest/APPROVER_ULU", "");
-				this.AppModel.setProperty("/claimRequest/APPROVER_FDLU", "");
-				this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_FULL_NAME", "");			
+			// this.AppModel.setProperty("/claimRequest/VERIFIER_STAFF_ID", "");
+			// this.AppModel.setProperty("/claimRequest/VERIFIER_NUSNET_ID", "");
+			// this.AppModel.setProperty("/claimRequest/VERIFIER_ULU", "");
+			// this.AppModel.setProperty("/claimRequest/VERIFIER_FDLU", "");
+			// this.AppModel.setProperty("/claimRequest/VERIFIER_STAFF_FULL_NAME", "");
+			this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_ID", "");
+			this.AppModel.setProperty("/claimRequest/APPROVER_NUSNET_ID", "");
+			this.AppModel.setProperty("/claimRequest/APPROVER_ULU", "");
+			this.AppModel.setProperty("/claimRequest/APPROVER_FDLU", "");
+			this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_FULL_NAME", "");
+			// this.AppModel.setProperty("/claimRequest/VERIFIER_STAFF_ID", '');
+			// this.AppModel.setProperty("/claimRequest/APPROVER_STAFF_ID", '');			
+			//	this.AppModel.setProperty("/submittedById", '');
 		}
 	});
 });
