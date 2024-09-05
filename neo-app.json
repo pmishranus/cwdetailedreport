@@ -2,6 +2,20 @@
   "welcomeFile": "/webapp/index.html",
   "routes": [
     {
+      "source": "^/catalog/(.*)$",
+      "target": "/v2/catalog/$1",
+      "destination": "nusbtputil",
+      "authenticationType": "xsuaa",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/util/(.*)$",
+      "target": "/v2/util/$1",
+      "destination": "nusbtputil",
+      "authenticationType": "xsuaa",
+      "csrfProtection": false
+    },
+    {
       "path": "/resources",
       "target": {
         "type": "service",
@@ -79,6 +93,21 @@
         "type": "service",
         "name": "userapi"
       }
+    },
+    {
+      "path": "/eclaims",
+      "target": {
+        "type": "destination",
+        "name": "nusbtpeclaim",
+        "entryPath": "/v2/eclaims"
+      },
+      "description": "NUS BTP Business Logic Destiantion"
+    },
+    {
+      "source": "^(.*)$",
+      "target": "$1",
+      "service": "html5-apps-repo-rt",
+      "authenticationType": "xsuaa"
     }
   ],
   "sendWelcomeFileRedirect": true

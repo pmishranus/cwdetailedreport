@@ -7,7 +7,7 @@ sap.ui.define([
 
 	Opa5.extendConfig({
 		arrangements: new Startup(),
-		viewNamespace: "nus.edu.sg.cw_detailedreport.view.",
+		viewNamespace: "nus.edu.sg.pttdetailedreport.view.",
 		autoWait: true
 	});
 });

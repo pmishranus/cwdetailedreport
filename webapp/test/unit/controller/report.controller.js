@@ -1,7 +1,7 @@
 /*global QUnit*/
 
 sap.ui.define([
-	"nus/edu/sg/cw_detailedreport/controller/report.controller"
+	"nus/edu/sg/pttdetailedreport/controller/report.controller"
 ], function (Controller) {
 	"use strict";
 
